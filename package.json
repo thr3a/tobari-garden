@@ -10,6 +10,7 @@
     "node-server": "node server.js"
   },
   "dependencies": {
+    "@ai-sdk/openai": "^3.0.63",
     "@biomejs/biome": "^2.4.14",
     "@mantine/core": "^9.1.1",
     "@mantine/form": "^9.1.1",
@@ -19,9 +20,11 @@
     "@types/node": "25.6.2",
     "@types/react": "19.2.14",
     "@types/react-dom": "19.2.3",
+    "ai": "^6.0.177",
     "bun": "^1.3.13",
     "dayjs": "^1.11.20",
     "next": "16.2.6",
+    "openai": "^6.37.0",
     "react": "19.2.6",
     "react-dom": "19.2.6",
     "tsx": "^4.21.0",
