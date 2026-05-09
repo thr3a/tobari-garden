@@ -1,10 +1,13 @@
 'use client';
 
+import { useChat } from '@ai-sdk/react';
 import {
   ActionIcon,
   Box,
+  Button,
   Flex,
   Image,
+  Loader,
   Modal,
   NumberInput,
   ScrollArea,
@@ -15,71 +18,104 @@ import {
 } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { IconSend, IconSettings } from '@tabler/icons-react';
-import { useRef, useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { DefaultChatTransport, type UIMessage } from 'ai';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import type { Conversation, Message } from '@/db/schema';
 
-type Message = {
-  id: string;
-  role: 'user' | 'assistant';
-  content: string;
+type ChatMainProps = {
+  conversationId: number;
 };
-
-type Settings = {
-  systemPrompt: string;
-  temperature: number;
-  endpoint: string;
-  modelName: string;
-};
-
-const DEFAULT_SETTINGS: Settings = {
-  systemPrompt: '',
-  temperature: 1,
-  endpoint: 'http://localhost:11434/v1',
-  modelName: 'llama3'
-};
-
-const MOCK_MESSAGES: Message[] = [
-  {
-    id: '1',
-    role: 'assistant',
-    content: 'こんにちは！私はあなたのAIアシスタントです。何かお手伝いできることはありますか？'
-  },
-  { id: '2', role: 'user', content: '今日の気分はどうですか？' },
-  {
-    id: '3',
-    role: 'assistant',
-    content: '今日もとても元気です！あなたのおかげで毎日楽しく過ごせています。今日は何か話したいことがありますか？'
-  }
-];
 
 const CHARACTER_IMAGE = 'https://placehold.jp/400x400.png';
 
-export const ChatMain = () => {
-  const [messages, setMessages] = useState<Message[]>(MOCK_MESSAGES);
-  const [input, setInput] = useState('');
+export const ChatMain = ({ conversationId }: ChatMainProps) => {
+  const queryClient = useQueryClient();
   const scrollRef = useRef<HTMLDivElement>(null);
   const [settingsOpened, { open: openSettings, close: closeSettings }] = useDisclosure(false);
-  const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
+  const [initialized, setInitialized] = useState(false);
+
+  const { data: conv } = useQuery<Conversation>({
+    queryKey: ['conversation', conversationId],
+    queryFn: () =>
+      fetch(`/api/conversations/${conversationId}`)
+        .then((r) => r.json())
+        .then((j) => j.result)
+  });
+
+  const { data: dbMessages } = useQuery<Message[]>({
+    queryKey: ['messages', conversationId],
+    queryFn: () =>
+      fetch(`/api/conversations/${conversationId}/messages`)
+        .then((r) => r.json())
+        .then((j) => j.result)
+  });
+
+  const updateConvMutation = useMutation({
+    mutationFn: (patch: Partial<Conversation>) =>
+      fetch(`/api/conversations/${conversationId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(patch)
+      }).then((r) => r.json()),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['conversation', conversationId] });
+    }
+  });
+
+  const [settings, setSettings] = useState({
+    systemPrompt: '',
+    temperature: 1,
+    endpoint: 'https://chatgpt-api.turai.work/v1',
+    modelName: 'deep01-reasoning-off'
+  });
+
+  useEffect(() => {
+    if (!conv) return;
+    setSettings({
+      systemPrompt: conv.systemPrompt,
+      temperature: conv.temperature,
+      endpoint: conv.endpoint,
+      modelName: conv.modelName
+    });
+  }, [conv]);
+
+  const [input, setInput] = useState('');
+
+  const transport = useMemo(
+    () => new DefaultChatTransport({ api: '/api/chat/', body: { conversationId } }),
+    [conversationId]
+  );
+
+  const { messages, sendMessage, setMessages, status } = useChat({
+    transport,
+    onFinish: () => {
+      queryClient.invalidateQueries({ queryKey: ['conversations'] });
+    }
+  });
+
+  useEffect(() => {
+    if (initialized || !dbMessages) return;
+    const uiMessages: UIMessage[] = dbMessages.map((m) => ({
+      id: String(m.id),
+      role: m.role,
+      content: m.content,
+      parts: [{ type: 'text' as const, text: m.content }]
+    }));
+    setMessages(uiMessages);
+    setInitialized(true);
+  }, [dbMessages, initialized, setMessages]);
+
+  const lastMessageId = messages.at(-1)?.id;
+  useEffect(() => {
+    if (!lastMessageId) return;
+    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
+  }, [lastMessageId]);
 
   const handleSend = () => {
     if (!input.trim()) return;
-
-    const userMessage: Message = {
-      id: String(Date.now()),
-      role: 'user',
-      content: input.trim()
-    };
-    setMessages((prev) => [...prev, userMessage]);
+    sendMessage({ text: input.trim() });
     setInput('');
-
-    // モック: 少し遅れてアシスタントが返答
-    setTimeout(() => {
-      const assistantMessage: Message = {
-        id: String(Date.now() + 1),
-        role: 'assistant',
-        content: 'なるほど、興味深いですね！もう少し詳しく教えてもらえますか？'
-      };
-      setMessages((prev) => [...prev, assistantMessage]);
-    }, 800);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -89,14 +125,24 @@ export const ChatMain = () => {
     }
   };
 
+  const handleSettingsSave = () => {
+    updateConvMutation.mutate({
+      systemPrompt: settings.systemPrompt,
+      temperature: settings.temperature,
+      endpoint: settings.endpoint,
+      modelName: settings.modelName
+    });
+    closeSettings();
+  };
+
+  const isStreaming = status === 'submitted' || status === 'streaming';
+
   return (
     <Flex direction='column' flex={1} h='100%'>
-      {/* キャラクター顔写真 */}
       <Box ta='center' pt='lg' pb='md' style={{ flexShrink: 0 }}>
         <Image src={CHARACTER_IMAGE} alt='AIキャラクター' w={120} h={120} mx='auto' />
       </Box>
 
-      {/* チャットメッセージ */}
       <ScrollArea flex={1} px='md' viewportRef={scrollRef}>
         <Stack gap='md' pb='md' maw={800} mx='auto'>
           {messages.map((message) => (
@@ -115,15 +161,22 @@ export const ChatMain = () => {
                 style={{ borderRadius: 12 }}
               >
                 <Text size='sm' style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
-                  {message.content}
+                  {message.parts
+                    .filter((p): p is { type: 'text'; text: string } => p.type === 'text')
+                    .map((p) => p.text)
+                    .join('')}
                 </Text>
               </Box>
             </Flex>
           ))}
+          {isStreaming && (
+            <Flex justify='flex-start'>
+              <Loader size='sm' type='dots' />
+            </Flex>
+          )}
         </Stack>
       </ScrollArea>
 
-      {/* 入力エリア */}
       <Box p='md' style={{ flexShrink: 0 }}>
         <Flex gap='xs' align='flex-end' maw={800} mx='auto'>
           <ActionIcon size='lg' variant='subtle' onClick={openSettings}>
@@ -138,14 +191,14 @@ export const ChatMain = () => {
             minRows={1}
             maxRows={5}
             autosize
+            disabled={isStreaming}
           />
-          <ActionIcon size='lg' variant='filled' onClick={handleSend} disabled={!input.trim()}>
+          <ActionIcon size='lg' variant='filled' onClick={handleSend} disabled={!input.trim() || isStreaming}>
             <IconSend size={16} />
           </ActionIcon>
         </Flex>
       </Box>
 
-      {/* 設定モーダル */}
       <Modal opened={settingsOpened} onClose={closeSettings} title='設定' centered>
         <Stack gap='md'>
           <Textarea
@@ -171,14 +224,23 @@ export const ChatMain = () => {
             label='ローカルLLM エンドポイント'
             placeholder='http://localhost:11434/v1'
             value={settings.endpoint}
-            onChange={(e) => setSettings((prev) => ({ ...prev, endpoint: e.currentTarget.value }))}
+            onChange={(e) => {
+              const v = e.currentTarget.value;
+              setSettings((prev) => ({ ...prev, endpoint: v }));
+            }}
           />
           <TextInput
             label='使用するモデル名'
             placeholder='llama3'
             value={settings.modelName}
-            onChange={(e) => setSettings((prev) => ({ ...prev, modelName: e.currentTarget.value }))}
+            onChange={(e) => {
+              const v = e.currentTarget.value;
+              setSettings((prev) => ({ ...prev, modelName: v }));
+            }}
           />
+          <Button variant='filled' fullWidth onClick={handleSettingsSave} loading={updateConvMutation.isPending}>
+            保存
+          </Button>
         </Stack>
       </Modal>
     </Flex>

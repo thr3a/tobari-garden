@@ -7,11 +7,15 @@
     "build": "next build",
     "start": "next start",
     "lint": "biome check --write ./src",
-    "node-server": "node server.js"
+    "node-server": "node server.js",
+    "db:push": "drizzle-kit push",
+    "db:studio": "drizzle-kit studio"
   },
   "dependencies": {
     "@ai-sdk/openai": "^3.0.63",
+    "@ai-sdk/react": "^3.0.179",
     "@biomejs/biome": "^2.4.14",
+    "@libsql/client": "^0.17.3",
     "@mantine/core": "^9.1.1",
     "@mantine/form": "^9.1.1",
     "@mantine/hooks": "^9.1.1",
@@ -23,6 +27,8 @@
     "ai": "^6.0.177",
     "bun": "^1.3.13",
     "dayjs": "^1.11.20",
+    "dotenv": "^17.4.2",
+    "drizzle-orm": "^0.45.2",
     "next": "16.2.6",
     "openai": "^6.37.0",
     "react": "19.2.6",
@@ -30,5 +36,8 @@
     "tsx": "^4.21.0",
     "typescript": "5.2.2",
     "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "drizzle-kit": "^0.31.10"
   }
 }

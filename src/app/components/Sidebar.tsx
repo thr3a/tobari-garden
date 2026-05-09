@@ -2,41 +2,56 @@
 
 import { ActionIcon, Box, Button, Flex, ScrollArea, Stack, Text } from '@mantine/core';
 import { IconPlus, IconTrash } from '@tabler/icons-react';
-
-type ChatHistory = {
-  id: string;
-  title: string;
-  updatedAt: string;
-};
-
-const MOCK_HISTORIES: ChatHistory[] = [
-  { id: '1', title: '今日の天気について', updatedAt: '2026-05-09' },
-  { id: '2', title: '好きな食べ物を教えて', updatedAt: '2026-05-08' },
-  { id: '3', title: 'おすすめの映画は？', updatedAt: '2026-05-07' },
-  { id: '4', title: '最近のニュース', updatedAt: '2026-05-06' },
-  { id: '5', title: '旅行の計画を立てて', updatedAt: '2026-05-05' }
-];
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import type { Conversation } from '@/db/schema';
 
 type SidebarProps = {
-  activeId?: string;
-  onSelect: (id: string) => void;
-  onNew: () => void;
+  activeId: number | null;
+  onSelect: (id: number) => void;
 };
 
-export const Sidebar = ({ activeId, onSelect, onNew }: SidebarProps) => {
+export const Sidebar = ({ activeId, onSelect }: SidebarProps) => {
+  const queryClient = useQueryClient();
+
+  const { data: conversations = [] } = useQuery<Pick<Conversation, 'id' | 'title' | 'updatedAt'>[]>({
+    queryKey: ['conversations'],
+    queryFn: () => fetch('/api/conversations').then((r) => r.json())
+  });
+
+  const createMutation = useMutation({
+    mutationFn: () => fetch('/api/conversations', { method: 'POST' }).then((r) => r.json()) as Promise<Conversation>,
+    onSuccess: (conv) => {
+      queryClient.invalidateQueries({ queryKey: ['conversations'] });
+      onSelect(conv.id);
+    }
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: number) => fetch(`/api/conversations/${id}`, { method: 'DELETE' }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['conversations'] });
+    }
+  });
+
   return (
     <Box w={240} h='100%' style={{ flexShrink: 0, display: 'flex', flexDirection: 'column' }}>
       <Box p='sm'>
-        <Button leftSection={<IconPlus size={16} />} variant='light' fullWidth onClick={onNew}>
+        <Button
+          leftSection={<IconPlus size={16} />}
+          variant='light'
+          fullWidth
+          onClick={() => createMutation.mutate()}
+          loading={createMutation.isPending}
+        >
           新しいチャット
         </Button>
       </Box>
 
       <ScrollArea flex={1} px='xs'>
         <Stack gap={4}>
-          {MOCK_HISTORIES.map((history) => (
+          {conversations.map((conv) => (
             <Flex
-              key={history.id}
+              key={conv.id}
               align='center'
               gap='xs'
               px='sm'
@@ -44,21 +59,22 @@ export const Sidebar = ({ activeId, onSelect, onNew }: SidebarProps) => {
               style={{
                 cursor: 'pointer',
                 borderRadius: 4,
-                fontWeight: activeId === history.id ? 'bold' : undefined
+                fontWeight: activeId === conv.id ? 'bold' : undefined
               }}
-              onClick={() => onSelect(history.id)}
+              onClick={() => onSelect(conv.id)}
             >
               <Box flex={1} style={{ overflow: 'hidden' }}>
                 <Text size='sm' style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                  {history.title}
+                  {conv.title || '新しいチャット'}
                 </Text>
-                <Text size='xs'>{history.updatedAt}</Text>
+                <Text size='xs'>{conv.updatedAt?.slice(0, 10)}</Text>
               </Box>
               <ActionIcon
                 variant='subtle'
                 size='sm'
                 onClick={(e) => {
                   e.stopPropagation();
+                  deleteMutation.mutate(conv.id);
                 }}
               >
                 <IconTrash size={12} />

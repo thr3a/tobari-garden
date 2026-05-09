@@ -4,7 +4,7 @@
 - 既存のコードコメントは、明示的な指示がない限り変更しない。
 - AI のモデル名（例：`gpt-4o`）は、ユーザーから指示があるまで勝手に変更しない。
 - `npm run build` は実行しない。
-- `src/scripts` 以下の TypeScript コードを実行するときは `node --import tsx ./src/scripts/hello.ts`
+- `src/scripts` 以下の TypeScript コードを実行するときは `node --import tsx --env-file .env ./src/scripts/hello.ts`
 
 ライブラリ概要
 

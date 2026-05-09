@@ -6,16 +6,12 @@ import { ChatMain } from './components/ChatMain';
 import { Sidebar } from './components/Sidebar';
 
 export default function Page() {
-  const [activeHistoryId, setActiveHistoryId] = useState<string>('1');
-
-  const handleNew = () => {
-    setActiveHistoryId('');
-  };
+  const [activeId, setActiveId] = useState<number | null>(null);
 
   return (
     <Flex h='100vh' style={{ overflow: 'hidden' }}>
-      <Sidebar activeId={activeHistoryId} onSelect={setActiveHistoryId} onNew={handleNew} />
-      <ChatMain />
+      <Sidebar activeId={activeId} onSelect={setActiveId} />
+      {activeId !== null && <ChatMain key={activeId} conversationId={activeId} />}
     </Flex>
   );
 }
