@@ -1,39 +1,12 @@
-# アップデート
+AIキャラクターとTTS使ったチャットができるWEBUI
+chatgptのような画面
 
-```
-npx -y npm-check-updates -ui
-```
+- 左サイドバーに履歴一覧
+- メインに https://placehold.jp/400x400.png で顔写真
+その下にチャットやりとり 下にテキストエリア入力
+マイク入力はなし
 
-# ts直接実行する
+src/app/components/.keep
+メインのコンポーネントはここに
 
-```
-node --import tsx --env-file .env --watch ./src/scripts/discord.ts
-```
-
-# デプロイ
-
-## GitHub Pages (https://thr3a.github.io/<レポジトリ名>の場合)
-
-next.config.mjsより
-
-```ts
-const nextConfig = {
-  basePath: process.env.GITHUB_ACTIONS && '/レポジトリ名',
-  trailingSlash: true,
-  // assetPrefix: '/レポジトリ名',
-};
-```
-
-## GitHub Pages (独自ドメインの場合)
-
-.github/workflows/build.ymlより「cname」をコメントアウト外す
-
-## Kamal
-
-```
-dotenv kamal deploy
-```
-
-# TODO
-
-- データベース
+src/app/page.tsx にモックをmantineで作ってください UI整えたら本実装に入りたい

@@ -1,0 +1,57 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - generic [ref=e3]:
+      - button "新しいチャット" [ref=e5] [cursor=pointer]:
+        - generic [ref=e6]:
+          - img [ref=e8]
+          - generic [ref=e9]: 新しいチャット
+      - generic [ref=e13]:
+        - generic [ref=e14] [cursor=pointer]:
+          - img [ref=e15]
+          - generic [ref=e17]:
+            - paragraph [ref=e18]: 今日の天気について
+            - paragraph [ref=e19]: 2026-05-09
+          - button [ref=e20]:
+            - img [ref=e22]
+        - generic [ref=e25] [cursor=pointer]:
+          - img [ref=e26]
+          - generic [ref=e28]:
+            - paragraph [ref=e29]: 好きな食べ物を教えて
+            - paragraph [ref=e30]: 2026-05-08
+          - button [ref=e31]:
+            - img [ref=e33]
+        - generic [ref=e36] [cursor=pointer]:
+          - img [ref=e37]
+          - generic [ref=e39]:
+            - paragraph [ref=e40]: おすすめの映画は？
+            - paragraph [ref=e41]: 2026-05-07
+          - button [ref=e42]:
+            - img [ref=e44]
+        - generic [ref=e47] [cursor=pointer]:
+          - img [ref=e48]
+          - generic [ref=e50]:
+            - paragraph [ref=e51]: 最近のニュース
+            - paragraph [ref=e52]: 2026-05-06
+          - button [ref=e53]:
+            - img [ref=e55]
+        - generic [ref=e58] [cursor=pointer]:
+          - img [ref=e59]
+          - generic [ref=e61]:
+            - paragraph [ref=e62]: 旅行の計画を立てて
+            - paragraph [ref=e63]: 2026-05-05
+          - button [ref=e64]:
+            - img [ref=e66]
+    - generic [ref=e69]:
+      - img "AIキャラクター" [ref=e71]
+      - generic [ref=e75]:
+        - paragraph [ref=e78]: こんにちは！私はあなたのAIアシスタントです。何かお手伝いできることはありますか？
+        - paragraph [ref=e81]: 今日の気分はどうですか？
+        - paragraph [ref=e84]: 今日もとても元気です！あなたのおかげで毎日楽しく過ごせています。今日は何か話したいことがありますか？
+      - generic [ref=e86]:
+        - button [ref=e87] [cursor=pointer]:
+          - img [ref=e89]
+        - textbox "メッセージを入力... (Enterで送信、Shift+Enterで改行)" [ref=e94]
+        - button [disabled] [ref=e95]:
+          - img [ref=e97]
+  - button "Open Next.js Dev Tools" [ref=e105] [cursor=pointer]:
+    - img [ref=e106]
