@@ -318,7 +318,7 @@ export const ChatMain = ({ conversationId }: ChatMainProps) => {
         </Flex>
       </Box>
 
-      <Modal```````````` opened={settingsOpened} onClose={closeSettings} title='設定' centered>
+      <Modal opened={settingsOpened} onClose={closeSettings} title='設定' centered>
         <Stack gap='md'>
           <Textarea
             label='システムプロンプト'
