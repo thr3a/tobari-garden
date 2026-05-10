@@ -1,6 +1,6 @@
 import { createOpenAI } from '@ai-sdk/openai';
 import { convertToModelMessages, streamText, type UIMessage } from 'ai';
-import { eq, sql } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import { type NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { db } from '@/db/client';
@@ -35,7 +35,36 @@ export const POST = async (req: NextRequest): Promise<Response> => {
     .map((p) => p.text)
     .join('');
 
-  await db.insert(messages).values({ conversationId, role: 'user', content: userText });
+  const persistedMessageId = Number(lastUserMessage.id);
+  const canReusePersistedMessageId = Number.isInteger(persistedMessageId) && persistedMessageId > 0;
+
+  if (canReusePersistedMessageId) {
+    const [existingUserMessage] = await db
+      .select()
+      .from(messages)
+      .where(
+        and(eq(messages.conversationId, conversationId), eq(messages.id, persistedMessageId), eq(messages.role, 'user'))
+      );
+
+    if (existingUserMessage) {
+      if (existingUserMessage.content !== userText) {
+        await db
+          .update(messages)
+          .set({ content: userText })
+          .where(
+            and(
+              eq(messages.conversationId, conversationId),
+              eq(messages.id, persistedMessageId),
+              eq(messages.role, 'user')
+            )
+          );
+      }
+    } else {
+      await db.insert(messages).values({ conversationId, role: 'user', content: userText });
+    }
+  } else {
+    await db.insert(messages).values({ conversationId, role: 'user', content: userText });
+  }
 
   if (!conv.title) {
     await db

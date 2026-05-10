@@ -17,7 +17,7 @@ import {
   TextInput
 } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
-import { IconSend, IconSettings } from '@tabler/icons-react';
+import { IconPencil, IconSend, IconSettings } from '@tabler/icons-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { DefaultChatTransport, type UIMessage } from 'ai';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -25,6 +25,11 @@ import type { Conversation, Message } from '@/db/schema';
 
 type ChatMainProps = {
   conversationId: number;
+};
+
+type EditingState = {
+  messageId: string;
+  content: string;
 };
 
 const CHARACTER_IMAGE = 'https://placehold.jp/400x400.png';
@@ -37,10 +42,18 @@ const toUiMessages = (dbMessages: Message[]): UIMessage[] =>
     parts: [{ type: 'text', text: message.content }]
   }));
 
+const getMessageText = (message: UIMessage): string =>
+  message.parts
+    .filter((p): p is { type: 'text'; text: string } => p.type === 'text')
+    .map((p) => p.text)
+    .join('');
+
 export const ChatMain = ({ conversationId }: ChatMainProps) => {
   const queryClient = useQueryClient();
   const scrollRef = useRef<HTMLDivElement>(null);
   const [settingsOpened, { open: openSettings, close: closeSettings }] = useDisclosure(false);
+  const [editingState, setEditingState] = useState<EditingState | null>(null);
+  const [hoveredMessageId, setHoveredMessageId] = useState<string | null>(null);
 
   const { data: conv } = useQuery<Conversation>({
     queryKey: ['conversation', conversationId],
@@ -94,7 +107,7 @@ export const ChatMain = ({ conversationId }: ChatMainProps) => {
     [conversationId]
   );
 
-  const { messages, sendMessage, setMessages, status } = useChat({
+  const { messages, sendMessage, setMessages, status, regenerate } = useChat({
     transport,
     onFinish: () => {
       queryClient.invalidateQueries({ queryKey: ['conversations'] });
@@ -139,6 +152,51 @@ export const ChatMain = ({ conversationId }: ChatMainProps) => {
     closeSettings();
   };
 
+  const startEditing = (message: UIMessage) => {
+    setEditingState({ messageId: message.id, content: getMessageText(message) });
+  };
+
+  const handleEditSubmit = async (message: UIMessage) => {
+    if (!editingState) return;
+    const trimmed = editingState.content.trim();
+    if (!trimmed) return;
+
+    await fetch(`/api/conversations/${conversationId}/messages/${message.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content: trimmed })
+    });
+
+    const idx = messages.findIndex((m) => m.id === message.id);
+    const updatedMessage: UIMessage = {
+      id: message.id,
+      role: message.role,
+      metadata: message.metadata,
+      parts: [{ type: 'text', text: trimmed }]
+    };
+
+    if (message.role === 'user') {
+      await fetch(`/api/conversations/${conversationId}/messages/${message.id}`, {
+        method: 'DELETE'
+      });
+
+      const truncated = [...messages.slice(0, idx), updatedMessage];
+      setMessages(truncated);
+      setEditingState(null);
+      regenerate();
+    } else {
+      setMessages(messages.map((m) => (m.id === message.id ? updatedMessage : m)));
+      setEditingState(null);
+    }
+  };
+
+  const handleEditKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>, message: UIMessage) => {
+    if (e.key === 'Enter' && e.shiftKey && !e.nativeEvent.isComposing) {
+      e.preventDefault();
+      handleEditSubmit(message);
+    }
+  };
+
   return (
     <Flex direction='column' flex={1} h='100%'>
       <Box ta='center' pt='lg' pb='md' style={{ flexShrink: 0 }}>
@@ -147,30 +205,89 @@ export const ChatMain = ({ conversationId }: ChatMainProps) => {
 
       <ScrollArea flex={1} px='md' viewportRef={scrollRef}>
         <Stack gap='md' pb='md' maw={800} mx='auto'>
-          {messages.map((message) => (
-            <Flex
-              key={message.id}
-              justify={message.role === 'user' ? 'flex-end' : 'flex-start'}
-              align='flex-end'
-              gap='xs'
-            >
-              <Box
-                maw='70%'
-                px='md'
-                py='sm'
-                bg={message.role === 'user' ? 'blue.6' : 'gray.1'}
-                c={message.role === 'user' ? 'white' : 'dark.8'}
-                style={{ borderRadius: 12 }}
+          {messages.map((message) => {
+            const isEditing = editingState?.messageId === message.id;
+            const isHovered = hoveredMessageId === message.id;
+            const isUser = message.role === 'user';
+
+            return (
+              <Flex
+                key={message.id}
+                justify={isUser ? 'flex-end' : 'flex-start'}
+                align='flex-end'
+                gap='xs'
+                onMouseEnter={() => setHoveredMessageId(message.id)}
+                onMouseLeave={() => setHoveredMessageId(null)}
               >
-                <Text size='sm' style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
-                  {message.parts
-                    .filter((p): p is { type: 'text'; text: string } => p.type === 'text')
-                    .map((p) => p.text)
-                    .join('')}
-                </Text>
-              </Box>
-            </Flex>
-          ))}
+                {isUser && !isEditing && isHovered && !editingState && (
+                  <ActionIcon size='sm' variant='subtle' c='gray.5' onClick={() => startEditing(message)}>
+                    <IconPencil size={14} />
+                  </ActionIcon>
+                )}
+
+                <Box
+                  maw={isEditing ? '80%' : '70%'}
+                  w={isEditing ? '80%' : undefined}
+                  px='md'
+                  py='sm'
+                  bg={isUser ? 'blue.6' : 'gray.1'}
+                  c={isUser ? 'white' : 'dark.8'}
+                  style={{ borderRadius: 12 }}
+                >
+                  {isEditing ? (
+                    <Stack gap='xs'>
+                      <Textarea
+                        value={editingState.content}
+                        onChange={(e) => {
+                          const value = e.currentTarget.value;
+                          setEditingState((prev) => (prev ? { ...prev, content: value } : null));
+                        }}
+                        onKeyDown={(e) => handleEditKeyDown(e, message)}
+                        minRows={2}
+                        maxRows={10}
+                        autosize
+                        autoFocus
+                        styles={{
+                          input: {
+                            color: isUser ? 'white' : undefined,
+                            backgroundColor: isUser ? 'var(--mantine-color-blue-7)' : undefined
+                          }
+                        }}
+                      />
+                      <Flex gap='xs' justify='flex-end'>
+                        <Button
+                          size='xs'
+                          variant='subtle'
+                          c={isUser ? 'white' : undefined}
+                          onClick={() => setEditingState(null)}
+                        >
+                          キャンセル
+                        </Button>
+                        <Button
+                          size='xs'
+                          variant={isUser ? 'white' : 'filled'}
+                          c={isUser ? 'blue.6' : undefined}
+                          onClick={() => handleEditSubmit(message)}
+                        >
+                          送信
+                        </Button>
+                      </Flex>
+                    </Stack>
+                  ) : (
+                    <Text size='sm' style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                      {getMessageText(message)}
+                    </Text>
+                  )}
+                </Box>
+
+                {!isUser && !isEditing && isHovered && !editingState && (
+                  <ActionIcon size='sm' variant='subtle' c='gray.5' onClick={() => startEditing(message)}>
+                    <IconPencil size={14} />
+                  </ActionIcon>
+                )}
+              </Flex>
+            );
+          })}
           {isStreaming && (
             <Flex justify='flex-start'>
               <Loader size='sm' type='dots' />
@@ -201,15 +318,14 @@ export const ChatMain = ({ conversationId }: ChatMainProps) => {
         </Flex>
       </Box>
 
-      <Modal opened={settingsOpened} onClose={closeSettings} title='設定' centered>
+      <Modal```````````` opened={settingsOpened} onClose={closeSettings} title='設定' centered>
         <Stack gap='md'>
           <Textarea
             label='システムプロンプト'
             placeholder='AIへの指示を入力...'
             value={settings.systemPrompt}
             onChange={(e) => setSettings((prev) => ({ ...prev, systemPrompt: e.target.value }))}
-            minRows={3}
-            maxRows={6}
+            minRows={20}
             autosize
           />
           <NumberInput

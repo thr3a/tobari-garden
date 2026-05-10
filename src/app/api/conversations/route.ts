@@ -12,6 +12,17 @@ export const GET = async (_req: NextRequest): Promise<NextResponse> => {
 };
 
 export const POST = async (_req: NextRequest): Promise<NextResponse> => {
-  const [row] = await db.insert(conversations).values({}).returning();
+  const [last] = await db
+    .select({
+      systemPrompt: conversations.systemPrompt,
+      temperature: conversations.temperature,
+      endpoint: conversations.endpoint,
+      modelName: conversations.modelName
+    })
+    .from(conversations)
+    .orderBy(desc(conversations.createdAt))
+    .limit(1);
+
+  const [row] = await db.insert(conversations).values(last ?? {}).returning();
   return NextResponse.json(row, { status: 201 });
 };
