@@ -36,4 +36,4 @@ next-env.d.ts
 .env
 
 *.db
-.playwright-cli/page-*.yml
+.playwright-cli

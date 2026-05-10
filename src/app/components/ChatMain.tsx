@@ -29,11 +29,18 @@ type ChatMainProps = {
 
 const CHARACTER_IMAGE = 'https://placehold.jp/400x400.png';
 
+const toUiMessages = (dbMessages: Message[]): UIMessage[] =>
+  dbMessages.map((message) => ({
+    id: String(message.id),
+    role: message.role,
+    content: message.content,
+    parts: [{ type: 'text', text: message.content }]
+  }));
+
 export const ChatMain = ({ conversationId }: ChatMainProps) => {
   const queryClient = useQueryClient();
   const scrollRef = useRef<HTMLDivElement>(null);
   const [settingsOpened, { open: openSettings, close: closeSettings }] = useDisclosure(false);
-  const [initialized, setInitialized] = useState(false);
 
   const { data: conv } = useQuery<Conversation>({
     queryKey: ['conversation', conversationId],
@@ -91,20 +98,17 @@ export const ChatMain = ({ conversationId }: ChatMainProps) => {
     transport,
     onFinish: () => {
       queryClient.invalidateQueries({ queryKey: ['conversations'] });
+      queryClient.invalidateQueries({ queryKey: ['messages', conversationId] });
     }
   });
 
+  const isStreaming = status === 'submitted' || status === 'streaming';
+
   useEffect(() => {
-    if (initialized || !dbMessages) return;
-    const uiMessages: UIMessage[] = dbMessages.map((m) => ({
-      id: String(m.id),
-      role: m.role,
-      content: m.content,
-      parts: [{ type: 'text' as const, text: m.content }]
-    }));
-    setMessages(uiMessages);
-    setInitialized(true);
-  }, [dbMessages, initialized, setMessages]);
+    if (!dbMessages) return;
+    if (isStreaming) return;
+    setMessages(toUiMessages(dbMessages));
+  }, [dbMessages, isStreaming, setMessages]);
 
   const lastMessageId = messages.at(-1)?.id;
   useEffect(() => {
@@ -134,8 +138,6 @@ export const ChatMain = ({ conversationId }: ChatMainProps) => {
     });
     closeSettings();
   };
-
-  const isStreaming = status === 'submitted' || status === 'streaming';
 
   return (
     <Flex direction='column' flex={1} h='100%'>
