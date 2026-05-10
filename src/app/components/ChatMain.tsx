@@ -119,7 +119,7 @@ export const ChatMain = ({ conversationId }: ChatMainProps) => {
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
+    if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
       e.preventDefault();
       handleSend();
     }
@@ -205,7 +205,7 @@ export const ChatMain = ({ conversationId }: ChatMainProps) => {
             label='システムプロンプト'
             placeholder='AIへの指示を入力...'
             value={settings.systemPrompt}
-            onChange={(e) => setSettings((prev) => ({ ...prev, systemPrompt: e.currentTarget.value }))}
+            onChange={(e) => setSettings((prev) => ({ ...prev, systemPrompt: e.target.value }))}
             minRows={3}
             maxRows={6}
             autosize

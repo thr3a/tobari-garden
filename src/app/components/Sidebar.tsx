@@ -56,6 +56,7 @@ export const Sidebar = ({ activeId, onSelect }: SidebarProps) => {
               gap='xs'
               px='sm'
               py='xs'
+              bg={activeId === conv.id ? 'blue.1' : undefined}
               style={{
                 cursor: 'pointer',
                 borderRadius: 4,
@@ -74,6 +75,7 @@ export const Sidebar = ({ activeId, onSelect }: SidebarProps) => {
                 size='sm'
                 onClick={(e) => {
                   e.stopPropagation();
+                  if (!window.confirm('このチャットを削除しますか？')) return;
                   deleteMutation.mutate(conv.id);
                 }}
               >
